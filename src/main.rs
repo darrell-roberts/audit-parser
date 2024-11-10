@@ -21,25 +21,19 @@ const HOSTNAME_MAP: LazyCell<RefCell<HashMap<IpAddr, String>>> =
 /// If we have a remote ip address attempt to resolve the hostname otherwise
 /// return the ip address.
 fn resolve_hostname(event: &AuditRecord<'_>) -> Option<String> {
-    event
-        .data
-        .get("laddr")
-        .and_then(|s| s.parse::<IpAddr>().ok())
-        .and_then(|ip| {
-            HOSTNAME_MAP
-                .borrow()
-                .get(&ip)
-                .map(ToOwned::to_owned)
-                .or_else(|| {
-                    let hostname = lookup_addr(&ip)
-                        .ok()
-                        .or_else(|| event.data.get("laddr").map(ToString::to_string));
-                    if let Some(host) = hostname.as_ref() {
-                        HOSTNAME_MAP.borrow_mut().insert(ip, host.to_owned());
-                    }
-                    hostname
-                })
-        })
+    let ip_str = event.data.get("laddr")?;
+
+    ip_str.parse::<IpAddr>().ok().and_then(|ip| {
+        HOSTNAME_MAP
+            .borrow()
+            .get(&ip)
+            .map(ToOwned::to_owned)
+            .or_else(|| {
+                let hostname = lookup_addr(&ip).ok().unwrap_or_else(|| ip_str.to_string());
+                HOSTNAME_MAP.borrow_mut().insert(ip, hostname.clone());
+                Some(hostname)
+            })
+    })
 }
 
 fn main() -> anyhow::Result<()> {
