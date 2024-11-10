@@ -72,12 +72,12 @@ fn main() -> anyhow::Result<()> {
                     if let Some(hostname) = resolve_hostname(&event) {
                         let port = event.data.get("lport").unwrap_or(&"none");
                         total_captured_connects += 1;
-                        println!("{uid} {exe} opened remote {hostname} port {port}");
+                        println!("{uid} {exe} {hostname} port {port}");
                     }
 
                     if let Some(path) = event.data.get("path") {
                         total_captured_connects += 1;
-                        println!("{uid} {exe} opened socket {path}");
+                        println!("{uid} {exe} {path}");
                     }
                 }
                 _ => (),
