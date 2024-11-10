@@ -17,10 +17,20 @@ pub enum AuditType {
     Cwd,
     Path,
     ProcTitle,
+    UserAcct,
+    CredAcq,
+    UserAuth,
+    UserCmd,
+    UserStart,
+    UserEnd,
+    Login,
+    CredRefr,
+    CredDisp,
+    DaemonEnd,
 }
 
 impl FromStr for AuditType {
-    type Err = ();
+    type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
@@ -29,7 +39,17 @@ impl FromStr for AuditType {
             "CWD" => Self::Cwd,
             "PATH" => Self::Path,
             "PROCTITLE" => Self::ProcTitle,
-            _ => return Err(()),
+            "USER_ACCT" => Self::UserAcct,
+            "CRED_ACQ" => Self::CredAcq,
+            "USER_AUTH" => Self::UserAuth,
+            "USER_CMD" => Self::UserCmd,
+            "USER_START" => Self::UserStart,
+            "USER_END" => Self::UserEnd,
+            "LOGIN" => Self::Login,
+            "CRED_REFR" => Self::CredRefr,
+            "CRED_DISP" => Self::CredDisp,
+            "DAEMON_END" => Self::DaemonEnd,
+            s => return Err(format!("Unsupported: {s}")),
         })
     }
 }

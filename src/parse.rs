@@ -1,8 +1,9 @@
-use crate::model::{AuditRecord, AuditType};
+use crate::types::{AuditRecord, AuditType};
 use anyhow::anyhow;
 use nom::{
+    branch::alt,
     bytes::complete::{tag, take_till},
-    character::complete::{alpha1, char, space1},
+    character::complete::{char, space1},
     combinator::map_res,
     multi::separated_list1,
     sequence::{delimited, separated_pair, tuple},
@@ -11,7 +12,10 @@ use nom::{
 use std::collections::HashMap;
 
 fn parse_type(input: &str) -> IResult<&str, AuditType> {
-    map_res(delimited(tag("type="), alpha1, space1), |s: &str| s.parse())(input)
+    map_res(
+        delimited(tag("type="), take_till(|c| c == ' '), space1),
+        |s: &str| s.parse(),
+    )(input)
 }
 
 fn parse_event_id(input: &str) -> IResult<&str, &str> {
@@ -36,7 +40,7 @@ pub fn parse_event(input: &str) -> anyhow::Result<AuditRecord<'_>> {
     let (rest, (event_type, id)) = tuple((parse_type, parse_event_id))(input).map_err(err_fn)?;
 
     let (_rest, nvps) = if matches!(event_type, AuditType::SockAddr) {
-        parse_socket_address(rest).map_err(err_fn)?
+        alt((parse_socket_address, parse_nvps))(rest).map_err(err_fn)?
     } else {
         parse_nvps(rest).map_err(err_fn)?
     };
@@ -51,7 +55,7 @@ pub fn parse_event(input: &str) -> anyhow::Result<AuditRecord<'_>> {
 #[cfg(test)]
 mod test {
     use super::{parse_event, parse_event_id, parse_nvps, parse_type};
-    use crate::model::AuditType;
+    use crate::types::AuditType;
 
     const EVENT_TEST_RECORD_1: &str = r#"type=SYSCALL msg=audit(1731175222.372:613194): arch=c000003e syscall=42 success=yes exit=0 a0=b a1=7ffef808d350 a2=10 a3=7ffef808d2f4 items=0 ppid=1 pid=3120 auid=4294967295 uid=101 gid=103 euid=101 suid=101 fsuid=101 egid=103 sgid=103 fsgid=103 tty=(none) ses=4294967295 comm="systemd-resolve" exe="/usr/lib/systemd/systemd-resolved" subj=unconfined key="network_connect"ARCH=x86_64 SYSCALL=connect AUID="unset" UID="systemd-resolve" GID="systemd-resolve" EUID="systemd-resolve" SUID="systemd-resolve" FSUID="systemd-resolve" EGID="systemd-resolve" SGID="systemd-resolve" FSGID="systemd-resolve""#;
 
