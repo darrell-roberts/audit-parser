@@ -1,5 +1,7 @@
 //! Types for an audit.log
-//! <https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/security_guide/sec-understanding_audit_log_files#sec-Understanding_Audit_Log_Files>
+//!
+//! <https://github.com/linux-audit/audit-documentation>
+//! <https://github.com/linux-audit/audit-documentation/blob/main/specs/fields/field-dictionary.csv>
 use std::{collections::HashMap, str::FromStr};
 
 /// An audit record from the audit.log.
@@ -7,6 +9,8 @@ use std::{collections::HashMap, str::FromStr};
 pub struct AuditRecord<'a> {
     /// Unique event id.
     pub id: &'a str,
+    /// Timestamp
+    pub time: jiff::Timestamp,
     /// Event type data.
     pub data: HashMap<&'a str, &'a str>,
     /// Event type.
