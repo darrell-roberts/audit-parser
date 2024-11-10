@@ -14,9 +14,12 @@ use types::{AuditRecord, AuditType};
 mod parse;
 mod types;
 
+/// Cache of ip -> hostname entries.
 const HOSTNAME_MAP: LazyCell<RefCell<HashMap<IpAddr, String>>> =
     LazyCell::new(|| RefCell::new(HashMap::new()));
 
+/// If we have a remote ip address attempt to resolve the hostname otherwise
+/// return the ip address.
 fn resolve_hostname(event: &AuditRecord<'_>) -> Option<String> {
     event
         .data
@@ -71,6 +74,7 @@ fn main() -> anyhow::Result<()> {
                 AuditType::SockAddr => {
                     let exe = exe_map.remove(event.id).unwrap_or_default();
                     let uid = uid_map.remove(event.id).unwrap_or_default();
+
                     if let Some(hostname) = resolve_hostname(&event) {
                         let port = event.data.get("lport").unwrap_or(&"none");
                         total_captured_connects += 1;

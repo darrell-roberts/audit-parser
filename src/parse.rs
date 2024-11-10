@@ -1,3 +1,6 @@
+//! Parses a single audit record into an [`AuditRecord`].
+//!
+//! Combinators for parsing audit records.
 use crate::types::{AuditRecord, AuditType};
 use anyhow::anyhow;
 use nom::{
@@ -35,6 +38,7 @@ fn parse_socket_address(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
     delimited(tag("{ "), parse_nvps, tag(" }"))(input)
 }
 
+/// Parse a single audit record line into an [`AuditRecord`] type.
 pub fn parse_event(input: &str) -> anyhow::Result<AuditRecord<'_>> {
     let err_fn = |e| anyhow!("Failed to parse event {}", e);
     let (rest, (event_type, id)) = tuple((parse_type, parse_event_id))(input).map_err(err_fn)?;
