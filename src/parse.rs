@@ -56,6 +56,7 @@ pub fn parse_event(input: &str) -> anyhow::Result<AuditRecord<'_>> {
 mod test {
     use super::{parse_event, parse_event_id, parse_nvps, parse_type};
     use crate::types::AuditType;
+    use std::collections::HashMap;
 
     const EVENT_TEST_RECORD_1: &str = r#"type=SYSCALL msg=audit(1731175222.372:613194): arch=c000003e syscall=42 success=yes exit=0 a0=b a1=7ffef808d350 a2=10 a3=7ffef808d2f4 items=0 ppid=1 pid=3120 auid=4294967295 uid=101 gid=103 euid=101 suid=101 fsuid=101 egid=103 sgid=103 fsgid=103 tty=(none) ses=4294967295 comm="systemd-resolve" exe="/usr/lib/systemd/systemd-resolved" subj=unconfined key="network_connect"ARCH=x86_64 SYSCALL=connect AUID="unset" UID="systemd-resolve" GID="systemd-resolve" EUID="systemd-resolve" SUID="systemd-resolve" FSUID="systemd-resolve" EGID="systemd-resolve" SGID="systemd-resolve" FSGID="systemd-resolve""#;
 
@@ -64,21 +65,19 @@ mod test {
     #[test]
     fn parse_record_test() {
         let (rest, result) = parse_type(EVENT_TEST_RECORD_1).unwrap();
-
         assert!(matches!(result, AuditType::SysCall));
-
         let (rest, result) = parse_event_id(rest).unwrap();
-
         assert_eq!(result, "1731175222.372:613194");
-
         let (_rest, nvps) = parse_nvps(rest).unwrap();
-
-        dbg!(nvps);
+        let data: HashMap<&str, &str> = HashMap::from_iter(nvps);
+        let exe = data.get("exe").unwrap();
+        assert_eq!(*exe, r#""/usr/lib/systemd/systemd-resolved""#);
     }
 
     #[test]
     fn parse_socket_record_test() {
         let result = parse_event(EVENT_TEST_RECORD_2).unwrap();
-        dbg!(result);
+        let ip = result.data.get("laddr").unwrap();
+        assert_eq!(*ip, "2a04:4e42::649");
     }
 }
