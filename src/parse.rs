@@ -88,6 +88,8 @@ pub fn parse_event(input: &str) -> anyhow::Result<AuditRecord<'_>> {
 
 #[cfg(test)]
 mod test {
+    use jiff::fmt::strtime;
+
     use super::{parse_event, parse_time};
 
     const EVENT_SYSCALL: &str = r#"type=SYSCALL msg=audit(1731248208.117:6983): arch=c000003e syscall=42 success=yes exit=0 a0=b a1=7ffda809ac90 a2=10 a3=7ffda809ac34 items=0 ppid=1 pid=2405 auid=4294967295 uid=101 gid=103 euid=101 suid=101 fsuid=101 egid=103 sgid=103 fsgid=103 tty=(none) ses=4294967295 comm="systemd-resolve" exe="/usr/lib/systemd/systemd-resolved" subj=unconfined key="network_connect"ARCH=x86_64 SYSCALL=connect AUID="unset" UID="systemd-resolve" GID="systemd-resolve" EUID="systemd-resolve" SUID="systemd-resolve" FSUID="systemd-resolve" EGID="systemd-resolve" SGID="systemd-resolve" FSGID="systemd-resolve""#;
@@ -117,6 +119,10 @@ mod test {
     fn test_parse_time() {
         let test = "1731248210.306:7020";
 
-        let (_rest, _result) = parse_time(test).unwrap();
+        let (_rest, result) = parse_time(test).unwrap();
+
+        let formatted = strtime::format("%a %-d %b %Y %T", result).unwrap();
+
+        assert_eq!(formatted, "Sun 10 Nov 2024 14:16:50");
     }
 }
