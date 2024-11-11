@@ -7,9 +7,8 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_till},
     character::complete::{char, digit1, space1},
-    combinator::{map_parser, map_res, peek, rest},
-    multi::separated_list1,
-    sequence::{delimited, separated_pair, tuple},
+    combinator::{iterator, map_parser, map_res, peek, rest},
+    sequence::{delimited, separated_pair, terminated, tuple},
     IResult,
 };
 use std::{char, collections::HashMap};
@@ -56,12 +55,15 @@ fn parse_nvp(input: &str) -> IResult<&str, (&str, &str)> {
     )(input)
 }
 
-fn parse_nvps(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
+fn parse_nvps(input: &str) -> IResult<&str, HashMap<&str, &str>> {
     let separator = alt((char(' '), char(ENRICHED_SEPARATOR)));
-    separated_list1(separator, parse_nvp)(input)
+    let mut iter = iterator(input, terminated(parse_nvp, separator));
+    let result = iter.collect::<HashMap<_, _>>();
+    let (rest, _) = iter.finish()?;
+    Ok((rest, result))
 }
 
-fn parse_socket_address(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
+fn parse_socket_address(input: &str) -> IResult<&str, HashMap<&str, &str>> {
     let (input, _ignore) = take_till(|c| c == '{')(input)?;
     delimited(tag("{ "), parse_nvps, tag(" }"))(input)
 }
@@ -72,7 +74,7 @@ pub fn parse_event(input: &str) -> anyhow::Result<AuditRecord<'_>> {
     let (rest, (event_type, (time, id))) =
         tuple((parse_type, parse_event_id))(input).map_err(err_fn)?;
 
-    let (_rest, nvps) = if matches!(event_type, AuditType::SockAddr) {
+    let (_rest, data) = if matches!(event_type, AuditType::SockAddr) {
         alt((parse_socket_address, parse_nvps))(rest).map_err(err_fn)?
     } else {
         parse_nvps(rest).map_err(err_fn)?
@@ -82,15 +84,14 @@ pub fn parse_event(input: &str) -> anyhow::Result<AuditRecord<'_>> {
         id,
         time,
         event_type,
-        data: HashMap::from_iter(nvps),
+        data,
     })
 }
 
 #[cfg(test)]
 mod test {
-    use jiff::fmt::strtime;
-
     use super::{parse_event, parse_time};
+    use jiff::fmt::strtime;
 
     const EVENT_SYSCALL: &str = r#"type=SYSCALL msg=audit(1731248208.117:6983): arch=c000003e syscall=42 success=yes exit=0 a0=b a1=7ffda809ac90 a2=10 a3=7ffda809ac34 items=0 ppid=1 pid=2405 auid=4294967295 uid=101 gid=103 euid=101 suid=101 fsuid=101 egid=103 sgid=103 fsgid=103 tty=(none) ses=4294967295 comm="systemd-resolve" exe="/usr/lib/systemd/systemd-resolved" subj=unconfined key="network_connect"ARCH=x86_64 SYSCALL=connect AUID="unset" UID="systemd-resolve" GID="systemd-resolve" EUID="systemd-resolve" SUID="systemd-resolve" FSUID="systemd-resolve" EGID="systemd-resolve" SGID="systemd-resolve" FSGID="systemd-resolve""#;
 
@@ -118,11 +119,8 @@ mod test {
     #[test]
     fn test_parse_time() {
         let test = "1731248210.306:7020";
-
         let (_rest, result) = parse_time(test).unwrap();
-
         let formatted = strtime::format("%a %-d %b %Y %T", result).unwrap();
-
         assert_eq!(formatted, "Sun 10 Nov 2024 14:16:50");
     }
 }
