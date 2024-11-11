@@ -7,7 +7,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_till},
     character::complete::{char, digit1, space1},
-    combinator::{iterator, map_parser, map_res, peek, rest},
+    combinator::{eof, iterator, map_parser, map_res, peek, rest},
     sequence::{delimited, separated_pair, terminated, tuple},
     IResult,
 };
@@ -47,7 +47,7 @@ fn quoted_value(input: &str) -> IResult<&str, &str> {
 }
 
 fn parse_nvp(input: &str) -> IResult<&str, (&str, &str)> {
-    let value_parser = take_till(|c| c == ' ' || c == ENRICHED_SEPARATOR);
+    let value_parser = alt((eof, take_till(|c| c == ' ' || c == ENRICHED_SEPARATOR)));
     separated_pair(
         take_till(|c| c == '='),
         tag("="),
@@ -56,10 +56,15 @@ fn parse_nvp(input: &str) -> IResult<&str, (&str, &str)> {
 }
 
 fn parse_nvps(input: &str) -> IResult<&str, HashMap<&str, &str>> {
-    let separator = alt((char(' '), char(ENRICHED_SEPARATOR)));
-    let mut iter = iterator(input, terminated(parse_nvp, separator));
-    let result = iter.collect::<HashMap<_, _>>();
+    let terminator = alt((tag(" }"), tag(" "), tag("\u{1d}")));
+    let mut iter = iterator(input, terminated(parse_nvp, terminator));
+    let mut result = iter.collect::<HashMap<_, _>>();
     let (rest, _) = iter.finish()?;
+
+    if !rest.is_empty() {
+        let (_, last) = parse_nvp(rest)?;
+        result.extend([last]);
+    }
     Ok((rest, result))
 }
 
@@ -107,6 +112,8 @@ mod test {
             Some(&"/usr/lib/systemd/systemd-resolved")
         );
         assert_eq!(record.data.get("SYSCALL"), Some(&"connect"));
+        assert_eq!(record.data.get("SGID"), Some(&"systemd-resolve"));
+        assert_eq!(record.data.get("FSGID"), Some(&"systemd-resolve"));
     }
 
     #[test]
