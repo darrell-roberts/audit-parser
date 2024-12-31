@@ -3,7 +3,7 @@ use dns_lookup::lookup_addr;
 use jiff::fmt::strtime;
 use parse::parse_event;
 use std::{
-    cell::{LazyCell, RefCell},
+    cell::RefCell,
     collections::HashMap,
     env,
     fs::File,
@@ -15,9 +15,11 @@ use types::{AuditRecord, AuditType};
 mod parse;
 mod types;
 
-/// Cache of ip -> hostname entries.
-const HOSTNAME_MAP: LazyCell<RefCell<HashMap<IpAddr, String>>> =
-    LazyCell::new(|| RefCell::new(HashMap::new()));
+thread_local! {
+    /// Cache of ip -> hostname entries.
+    pub static HOSTNAME_MAP: RefCell<HashMap<IpAddr, String>> =
+        RefCell::new(HashMap::new());
+}
 
 /// If we have a remote ip address attempt to resolve the hostname otherwise
 /// return the ip address.
@@ -25,15 +27,13 @@ fn resolve_hostname(event: &AuditRecord<'_>) -> Option<String> {
     let ip_str = event.data.get("laddr")?;
 
     ip_str.parse::<IpAddr>().ok().and_then(|ip| {
-        HOSTNAME_MAP
-            .borrow()
-            .get(&ip)
-            .map(ToOwned::to_owned)
-            .or_else(|| {
-                let hostname = lookup_addr(&ip).ok().unwrap_or_else(|| ip_str.to_string());
-                HOSTNAME_MAP.borrow_mut().insert(ip, hostname.clone());
-                Some(hostname)
-            })
+        let val = HOSTNAME_MAP.with_borrow(|m| m.get(&ip).map(ToOwned::to_owned));
+
+        val.or_else(|| {
+            let hostname = lookup_addr(&ip).ok().unwrap_or_else(|| ip_str.to_string());
+            HOSTNAME_MAP.with_borrow_mut(|m| m.insert(ip, hostname.clone()));
+            Some(hostname)
+        })
     })
 }
 
