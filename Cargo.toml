@@ -17,6 +17,6 @@ extended-description = """Parse linux auditd log"""
 section = "utility"
 priority = "optional"
 assets = [
-    ["target/release/autid-parser", "usr/bin/", "755"],
-    ["assets/folder-stats-tui.1.gz", "usr/share/man/man1/", "644"]
+    ["target/release/audit-parser", "usr/bin/", "755"],
+    ["assets/audit-parser.1.gz", "usr/share/man/man1/", "644"]
 ]
