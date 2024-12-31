@@ -1,0 +1,51 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - "v*" # Triggers on tags starting with 'v'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      # - name: Download linuxdeploy
+      #   run: |
+      #     wget -nv -c https://github.com/linuxdeploy/linuxdeploy/releases/download/2.0.0-alpha-1-20241106/linuxdeploy-x86_64.AppImage
+      #     chmod +x linuxdeploy-x86_64.AppImage
+      #     mkdir -p ~/.local/bin
+      #     mv linuxdeploy-x86_64.AppImage ~/.local/bin
+      #     sudo add-apt-repository universe
+      #     sudo apt install libfuse2t64
+
+      # - name: Build bundle
+      #   run: |
+      #     export PATH=$HOME/.local/bin:$PATH
+      #     make linux-app-image
+
+      - name: Debian package
+        run: |
+          cargo install cargo-deb
+          cargo deb
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/debian/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

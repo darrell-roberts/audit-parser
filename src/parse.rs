@@ -7,7 +7,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_till},
     character::complete::{char, digit1, space1},
-    combinator::{eof, iterator, map_parser, map_res, peek, rest},
+    combinator::{eof, iterator, map_parser, map_res, peek, rest, value},
     sequence::{delimited, separated_pair, terminated, tuple},
     IResult,
 };
@@ -69,7 +69,7 @@ fn parse_nvps(input: &str) -> IResult<&str, HashMap<&str, &str>> {
 }
 
 fn parse_socket_address(input: &str) -> IResult<&str, HashMap<&str, &str>> {
-    let (input, _ignore) = take_till(|c| c == '{')(input)?;
+    let (input, _) = value((), take_till(|c| c == '{'))(input)?;
     delimited(tag("{ "), parse_nvps, tag(" }"))(input)
 }
 
