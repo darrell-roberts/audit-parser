@@ -1,0 +1,74 @@
+.\" Manpage for audit-parser
+.TH AUDIT-PARSER 1 "October 2024" "1.0" "User Commands"
+.SH NAME
+audit-parser \- Parse and analyze Linux audit logs
+
+.SH SYNOPSIS
+.B audit-parser
+.I [OPTIONS]
+.I FILE
+
+.SH DESCRIPTION
+.B audit-parser
+is a command-line tool written in Rust for parsing and analyzing Linux audit logs. It processes audit records, focusing on system calls such as "connect", resolves IP addresses to hostnames, and outputs formatted information including timestamps, user IDs, executable names, hostnames, and ports involved in network connections.
+
+The tool maintains a cache of IP to hostname mappings to optimize repeated lookups, improving performance when resolving multiple entries.
+
+.SH OPTIONS
+.TP
+.B \-h, \-\-help
+Display help information and exit.
+
+.TP
+.I FILE
+Path to the audit log file to be parsed. This is a required positional argument.
+
+.SH USAGE
+To parse an audit log file and display connection information:
+
+.RS
+\fBaudit-parser /var/log/audit/audit.log\fP
+.RE
+
+The tool will output lines with the format:
+
+.RS
+\fB<timestamp> <UID> <exe> <hostname> port <port>\fP
+.RE
+
+Example Output:
+
+.RS
+\fBSun 10 Nov 2024 14:16:50 1001 /usr/lib/systemd/systemd-resolved example.com port 53\fP
+
+\fBSun 10 Nov 2024 14:17:10 1002 /usr/bin/nginx /var/www/html\fP
+
+Total syscall connect 15 / parsed 12
+.RE
+
+.SH EXIT STATUS
+.B audit-parser
+exits with status code
+.B 0
+on success and a non-zero value on failure.
+
+.SH EXAMPLES
+.PP
+Parse a specific audit log and resolve hostnames:
+
+.RS
+\fBaudit-parser /var/log/audit/audit.log\fP
+.RE
+
+.SH AUTHOR
+Written by Darrell Roberts.
+
+.SH REPORTING BUGS
+Report bugs to \fBhttps://github.com/darrell-roberts/audit-parser/issues\fP.
+
+.SH COPYRIGHT
+© 2024 Darrell Roberts. License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it. There is NO WARRANTY, to the extent permitted by law.
+
+.SH SEE ALSO
+audit(8), auditctl(8), systemd-resolved(1)

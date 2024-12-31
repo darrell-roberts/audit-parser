@@ -8,3 +8,15 @@ nom = "7"
 anyhow = "1"
 dns-lookup = "2"
 jiff = "0.1"
+
+[package.metadata.deb]
+maintainer = "Darrell Roberts"
+copyright = "2024, Darrell Roberts"
+license-file = "LICENSE"
+extended-description = """Parse linux auditd log"""
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/autid-parser", "usr/bin/", "755"],
+    ["assets/folder-stats-tui.1.gz", "usr/share/man/man1/", "644"]
+]
