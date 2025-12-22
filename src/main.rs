@@ -35,7 +35,7 @@ fn main() -> anyhow::Result<()> {
     let mut exe_map = HashMap::new();
     let mut uid_map = HashMap::new();
 
-    for (line, line_num) in buffer.lines().zip(1..) {
+    for line in buffer.lines() {
         let line = line?;
         let event = parse_event(&line);
 
@@ -71,7 +71,7 @@ fn main() -> anyhow::Result<()> {
                 _ => (),
             },
             Err(err) => {
-                eprintln!("failed to parse {line_num}: {err}");
+                eprintln!("Failed to parse: {err}");
             }
         }
     }
