@@ -12,7 +12,7 @@ auditctl -a always,exit -F arch=b64 -S connect -F key=network_connect
 The parser prints out the user, executable and remote host, port or socket path opened.
 
 ```
-# auditd-parser /var/log/audit/audit.log
+# tail -f /var/log/audit/audit.log | audit-parser
 Sun 10 Nov 2024 14:16:50 root /usr/sbin/NetworkManager ubuntu-content-cache-3.ps5.canonical.com port 80
 Sun 10 Nov 2024 14:16:50 root /usr/sbin/NetworkManager ubuntu-content-cache-1.ps6.canonical.com port 80
 Sun 10 Nov 2024 14:16:50 root /usr/sbin/NetworkManager ubuntu-content-cache-2.ps5.canonical.com port 80

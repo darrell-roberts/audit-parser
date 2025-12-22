@@ -1,15 +1,7 @@
-use anyhow::Context;
 use dns_lookup::lookup_addr;
 use jiff::fmt::strtime;
 use parse::parse_event;
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    env,
-    fs::File,
-    io::{BufRead, BufReader},
-    net::IpAddr,
-};
+use std::{cell::RefCell, collections::HashMap, io::stdin, net::IpAddr};
 use types::{AuditRecord, AuditType};
 
 mod parse;
@@ -38,14 +30,10 @@ fn resolve_hostname(event: &AuditRecord<'_>) -> Option<String> {
 }
 
 fn main() -> anyhow::Result<()> {
-    let input_file = env::args().nth(1).context("missing file argument")?;
-    let buffer = BufReader::new(File::open(input_file)?);
+    let buffer = stdin();
 
     let mut exe_map = HashMap::new();
     let mut uid_map = HashMap::new();
-
-    let mut total_syscall_connect = 0;
-    let mut total_captured_connects = 0;
 
     for (line, line_num) in buffer.lines().zip(1..) {
         let line = line?;
@@ -54,11 +42,6 @@ fn main() -> anyhow::Result<()> {
         match event {
             Ok(event) => match event.event_type {
                 AuditType::SysCall => {
-                    if let Some(&syscall) = event.data.get("SYSCALL") {
-                        if syscall == "connect" {
-                            total_syscall_connect += 1;
-                        }
-                    }
                     if let Some(exe) = event.data.get("exe") {
                         exe_map.insert(event.id.to_string(), exe.to_string());
                     }
@@ -72,7 +55,6 @@ fn main() -> anyhow::Result<()> {
 
                     if let Some(hostname) = resolve_hostname(&event) {
                         let port = event.data.get("lport").unwrap_or(&"none");
-                        total_captured_connects += 1;
                         println!(
                             "{} {uid} {exe} {hostname} port {port}",
                             strtime::format("%a %-d %b %Y %T", event.time)?
@@ -80,7 +62,6 @@ fn main() -> anyhow::Result<()> {
                     }
 
                     if let Some(path) = event.data.get("path") {
-                        total_captured_connects += 1;
                         println!(
                             "{} {uid} {exe} {path}",
                             strtime::format("%a %-d %b %Y %T", event.time)?
@@ -90,13 +71,10 @@ fn main() -> anyhow::Result<()> {
                 _ => (),
             },
             Err(err) => {
-                println!("failed to parse {line_num}: {err}");
+                eprintln!("failed to parse {line_num}: {err}");
             }
         }
     }
-
-    println!();
-    println!("Total syscall connect {total_syscall_connect} / parsed {total_captured_connects}");
 
     Ok(())
 }
