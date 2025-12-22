@@ -8,8 +8,8 @@ use nom::{
     bytes::complete::{tag, take_till},
     character::complete::{char, digit1, space1},
     combinator::{eof, iterator, map_parser, map_res, peek, rest, value},
-    sequence::{delimited, separated_pair, terminated, tuple},
-    IResult,
+    sequence::{delimited, separated_pair, terminated},
+    IResult, Parser as _,
 };
 use std::{char, collections::HashMap};
 
@@ -20,7 +20,8 @@ fn parse_type(input: &str) -> IResult<&str, AuditType> {
     map_res(
         delimited(tag("type="), take_till(|c| c == ' '), space1),
         |s: &str| s.parse(),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn parse_time(input: &str) -> IResult<&str, jiff::Timestamp> {
@@ -32,18 +33,19 @@ fn parse_time(input: &str) -> IResult<&str, jiff::Timestamp> {
     );
     map_res(parser, |(seconds, nano)| {
         jiff::Timestamp::new(seconds, nano)
-    })(unix_time)
+    })
+    .parse(unix_time)
 }
 
 fn parse_event_id(input: &str) -> IResult<&str, (jiff::Timestamp, &str)> {
     // peek into the portion that has the timestamp and then take the full
     // id.
-    let parse = tuple((peek(parse_time), take_till(|c| c == ')')));
-    delimited(tag("msg=audit("), parse, tag("): "))(input)
+    let parse = (peek(parse_time), take_till(|c| c == ')'));
+    delimited(tag("msg=audit("), parse, tag("): ")).parse(input)
 }
 
 fn quoted_value(input: &str) -> IResult<&str, &str> {
-    delimited(char('"'), take_till(|c| c == '"'), char('"'))(input)
+    delimited(char('"'), take_till(|c| c == '"'), char('"')).parse(input)
 }
 
 fn parse_nvp(input: &str) -> IResult<&str, (&str, &str)> {
@@ -52,13 +54,14 @@ fn parse_nvp(input: &str) -> IResult<&str, (&str, &str)> {
         take_till(|c| c == '='),
         tag("="),
         map_parser(value_parser, alt((quoted_value, rest))),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn parse_nvps(input: &str) -> IResult<&str, HashMap<&str, &str>> {
     let terminator = alt((tag(" }"), tag(" "), tag("\u{1d}")));
     let mut iter = iterator(input, terminated(parse_nvp, terminator));
-    let mut result = iter.collect::<HashMap<_, _>>();
+    let mut result = iter.by_ref().collect::<HashMap<_, _>>();
     let (rest, _) = iter.finish()?;
 
     if !rest.is_empty() {
@@ -69,18 +72,20 @@ fn parse_nvps(input: &str) -> IResult<&str, HashMap<&str, &str>> {
 }
 
 fn parse_socket_address(input: &str) -> IResult<&str, HashMap<&str, &str>> {
-    let (input, _) = value((), take_till(|c| c == '{'))(input)?;
-    delimited(tag("{ "), parse_nvps, tag(" }"))(input)
+    let (input, _) = value((), take_till(|c| c == '{')).parse(input)?;
+    delimited(tag("{ "), parse_nvps, tag(" }")).parse(input)
 }
 
 /// Parse a single audit record line into an [`AuditRecord`] type.
 pub fn parse_event(input: &str) -> anyhow::Result<AuditRecord<'_>> {
     let err_fn = |e| anyhow!("Failed to parse event {}", e);
     let (rest, (event_type, (time, id))) =
-        tuple((parse_type, parse_event_id))(input).map_err(err_fn)?;
+        (parse_type, parse_event_id).parse(input).map_err(err_fn)?;
 
     let (_rest, data) = if matches!(event_type, AuditType::SockAddr) {
-        alt((parse_socket_address, parse_nvps))(rest).map_err(err_fn)?
+        alt((parse_socket_address, parse_nvps))
+            .parse(rest)
+            .map_err(err_fn)?
     } else {
         parse_nvps(rest).map_err(err_fn)?
     };

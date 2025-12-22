@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-nom = "7"
+nom = "8"
 anyhow = "1"
-dns-lookup = "2"
-jiff = "0.1"
+dns-lookup = "3"
+jiff = "0.2"
 
 [package.metadata.deb]
 maintainer = "Darrell Roberts"
@@ -17,6 +17,14 @@ extended-description = """Parse linux auditd log"""
 section = "utility"
 priority = "optional"
 assets = [
-    ["target/release/audit-parser", "usr/bin/", "755"],
-    ["assets/audit-parser.1.gz", "usr/share/man/man1/", "644"]
+    [
+        "target/release/audit-parser",
+        "usr/bin/",
+        "755",
+    ],
+    [
+        "assets/audit-parser.1.gz",
+        "usr/share/man/man1/",
+        "644",
+    ],
 ]
