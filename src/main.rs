@@ -1,5 +1,4 @@
 use dns_lookup::lookup_addr;
-use jiff::fmt::strtime;
 use parse::parse_event;
 use std::{cell::RefCell, collections::HashMap, io::stdin, net::IpAddr};
 use types::{AuditRecord, AuditType};
@@ -29,11 +28,16 @@ fn resolve_hostname(event: &AuditRecord<'_>) -> Option<String> {
     })
 }
 
+#[derive(Default)]
+struct UserAndExecutable {
+    user: String,
+    executable: String,
+}
+
 fn main() -> anyhow::Result<()> {
     let buffer = stdin();
 
-    let mut exe_map = HashMap::new();
-    let mut uid_map = HashMap::new();
+    let mut user_exec_map: HashMap<String, UserAndExecutable> = HashMap::new();
 
     for line in buffer.lines() {
         let line = line?;
@@ -42,36 +46,64 @@ fn main() -> anyhow::Result<()> {
         match event {
             Ok(event) => match event.event_type {
                 AuditType::SysCall => {
+                    let user_and_exec = user_exec_map.entry(event.id.to_string()).or_default();
                     if let Some(exe) = event.data.get("exe") {
-                        exe_map.insert(event.id.to_string(), exe.to_string());
+                        user_and_exec.executable = exe.to_string();
                     }
                     if let Some(uid) = event.data.get("UID") {
-                        uid_map.insert(event.id.to_string(), uid.to_string());
+                        user_and_exec.user = uid.to_string();
                     }
                 }
                 AuditType::SockAddr => {
-                    let exe = exe_map.remove(event.id).unwrap_or_default();
-                    let uid = uid_map.remove(event.id).unwrap_or_default();
+                    let Some(user_and_exec) = user_exec_map.remove(event.id) else {
+                        continue;
+                    };
+
+                    // Skip showing DNS lookups from ourself.
+                    if user_and_exec.executable.contains("audit-parser") {
+                        continue;
+                    }
 
                     if let Some(hostname) = resolve_hostname(&event) {
                         let port = event.data.get("lport").unwrap_or(&"none");
                         println!(
-                            "{} {uid} {exe} {hostname} port {port}",
-                            strtime::format("%a %-d %b %Y %T", event.time)?
+                            "{} {} {} {hostname} port {port}",
+                            event.formatted_time()?,
+                            user_and_exec.user,
+                            user_and_exec.executable,
                         );
-                    }
-
-                    if let Some(path) = event.data.get("path") {
+                    } else if let Some(path) = event.data.get("path") {
                         println!(
-                            "{} {uid} {exe} {path}",
-                            strtime::format("%a %-d %b %Y %T", event.time)?
+                            "{} {} {} {path}",
+                            event.formatted_time()?,
+                            user_and_exec.user,
+                            user_and_exec.executable
+                        );
+                    } else {
+                        println!(
+                            "{} {} {} {:?}",
+                            event.formatted_time()?,
+                            user_and_exec.user,
+                            user_and_exec.executable,
+                            event.data,
                         );
                     }
                 }
-                _ => (),
+                _ => {
+                    if let Some(user_and_exec) = user_exec_map.remove(event.id) {
+                        println!(
+                            "{} {} {} {:?} {:?}",
+                            event.formatted_time()?,
+                            user_and_exec.user,
+                            user_and_exec.executable,
+                            event.event_type,
+                            event.data
+                        );
+                    }
+                }
             },
             Err(err) => {
-                eprintln!("Failed to parse: {err}");
+                eprintln!("Failed to parse: {err}, record: {line}");
             }
         }
     }

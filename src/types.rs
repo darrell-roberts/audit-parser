@@ -2,7 +2,10 @@
 //!
 //! <https://github.com/linux-audit/audit-documentation>
 //! <https://github.com/linux-audit/audit-documentation/blob/main/specs/fields/field-dictionary.csv>
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, fmt::Display, str::FromStr};
+
+use anyhow::Context as _;
+use jiff::{fmt::strtime, tz::TimeZone};
 
 /// An audit record from the audit.log.
 #[derive(Debug)]
@@ -15,6 +18,18 @@ pub struct AuditRecord<'a> {
     pub data: HashMap<&'a str, &'a str>,
     /// Event type.
     pub event_type: AuditType,
+}
+
+impl Display for AuditRecord<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {:?} {:?}",
+            self.formatted_time().unwrap_or_default(),
+            self.event_type,
+            self.data
+        )
+    }
 }
 
 /// Audit record types.
@@ -68,5 +83,13 @@ impl FromStr for AuditType {
             "BPF" => Self::Bpf,
             s => return Err(format!("Unsupported: {s}")),
         })
+    }
+}
+
+impl AuditRecord<'_> {
+    /// Formatted time.
+    pub fn formatted_time(&self) -> anyhow::Result<String> {
+        strtime::format("%a %-d %b %Y %T", &self.time.to_zoned(TimeZone::system()))
+            .context("Time formatting failed")
     }
 }
